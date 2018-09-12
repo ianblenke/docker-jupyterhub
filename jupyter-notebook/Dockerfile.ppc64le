@@ -476,6 +476,8 @@ RUN chown -R $NB_USER:users /home/$NB_USER
 RUN chown -R $NB_USER:users /usr/local
 RUN chown -R $NB_USER:users /opt/conda
 
+RUN yes | pip install --quiet --no-cache-dir 'jupyterhub'
+
 ## Install VNC
 #RUN apt-get install -y --no-install-recommends xterm xfonts-base x11-xserver-utils supervisor openbox wget bzip2 ca-certificates websockify xinit novnc xfce4
 #
