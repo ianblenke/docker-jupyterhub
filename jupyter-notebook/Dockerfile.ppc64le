@@ -94,10 +94,10 @@ RUN mkdir /home/$NB_USER/work && \
     fix-permissions /home/$NB_USER
 
 # Install conda as jovyan
-ENV MINICONDA_VERSION 4.5.4
+ENV MINICONDA_VERSION 4.5.11
 RUN cd /tmp && \
     wget --quiet https://repo.continuum.io/miniconda/Miniconda3-${MINICONDA_VERSION}-Linux-ppc64le.sh && \
-    echo "05c1e073f262105179cf57920dfc4d43 *Miniconda3-${MINICONDA_VERSION}-Linux-ppc64le.sh" | md5sum -c - && \
+    echo "4b1ac3b4b70bfa710c9f1c5c6d3f3166 *Miniconda3-${MINICONDA_VERSION}-Linux-ppc64le.sh" | md5sum -c - && \
     /bin/bash Miniconda3-${MINICONDA_VERSION}-Linux-ppc64le.sh -f -b -p $CONDA_DIR && \
     rm Miniconda3-${MINICONDA_VERSION}-Linux-ppc64le.sh && \
     $CONDA_DIR/bin/conda config --system --prepend channels conda-forge && \
@@ -364,6 +364,8 @@ ENV TF_CUDA_COMPUTE_CAPABILITIES=3.0,3.5,5.2,6.0,6.1
 # TODO get NCCL 2 in the docker image
 ENV TF_NCCL_VERSION 1
 
+RUN apt-get update && apt-get install -y --reinstall ca-certificates
+
 RUN git clone https://github.com/tensorflow/tensorflow && \
     cd tensorflow && \
     git checkout v1.10.0 && \
@@ -462,8 +464,17 @@ RUN conda update -n base -c defaults conda
 #RUN apt-get install -y python-opencv python-opencv-apps libopencv-gpu-dev
 RUN yes | conda install opencv py-opencv
 
+# Install theano for python3
+RUN yes | conda install theano
+
+# Install theano and keras for python2
+RUN bash -c 'export PATH=/opt/conda/bin:$PATH ; \
+    source activate py2 ; \
+    yes | conda install theano keras'
+
 RUN chown -R $NB_USER:users /home/$NB_USER
 RUN chown -R $NB_USER:users /usr/local
+RUN chown -R $NB_USER:users /opt/conda
 
 ## Install VNC
 #RUN apt-get install -y --no-install-recommends xterm xfonts-base x11-xserver-utils supervisor openbox wget bzip2 ca-certificates websockify xinit novnc xfce4
