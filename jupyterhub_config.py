@@ -3,6 +3,7 @@
 
 # Configuration file for JupyterHub
 import os
+from oauthenticator.github import GitHubOAuthenticator
 
 c = get_config()
 
@@ -85,6 +86,7 @@ c.Spawner.debug = True
 c.LocalProcessSpawner.debug = True
 
 # Whitlelist users and admins
+
 c.Authenticator.whitelist = whitelist = set()
 c.Authenticator.admin_users = admin = set()
 c.JupyterHub.admin_access = True
@@ -98,3 +100,5 @@ with open(os.path.join(pwd, 'userlist')) as f:
         whitelist.add(name)
         if len(parts) > 1 and parts[1] == 'admin':
             admin.add(name)
+
+c.JupyterHub.authenticator_class = os.environ.get('JUPYTERHUB_AUTHENTICATOR_CLASS') or GitHubOAuthenticator
