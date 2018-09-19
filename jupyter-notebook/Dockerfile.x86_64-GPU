@@ -1,35 +1,10 @@
-FROM nvidia/cuda-ppc64le:9.0-cudnn7-devel-ubuntu16.04
+FROM nvidia/cuda:9.0-cudnn7-devel-ubuntu16.04
 
-# This is a mess. It is a cobbled together patchwork of the upstream Dockerfiles from JupyterHub, with a smattering of IBM Power8 architecture build magic
+# This is a mess. It is a cobbled together patchwork of the upstream Dockerfiles from JupyterHub
 
 USER root
 
 ENV DEBIAN_FRONTEND noninteractive
-
-# Install the IBM xl-compiler
-RUN apt-get update
-RUN apt-get install -y wget
-RUN wget -q http://public.dhe.ibm.com/software/server/POWER/Linux/xl-compiler/eval/ppc64le/ubuntu/public.gpg -O- | apt-key add - && \
-    echo "deb http://public.dhe.ibm.com/software/server/POWER/Linux/xl-compiler/eval/ppc64le/ubuntu/ trusty main" | tee /etc/apt/sources.list.d/ibm-xl-compiler-eval.list && \
-    apt-get update && \
-    apt-get install -y libxlmass-devel.9.1.0 libxlc-devel libxlf-devel libxlsmp-devel.5.1.0 xlc.16.1.0 xlc-license-community.16.1.0 xlf.16.1.0 xlf-license-community.16.1.0
-
-# Install the advance-toolchain (at) compiler
-#RUN echo "deb http://ports.ubuntu.com/ubuntu-ports xenial main security universe multiverse" > /etc/apt/sources.list.d/ports.list
-#RUN echo "deb http://us.ports.ubuntu.com/ubuntu-ports/ xenial-backports main restricted universe multiverse" > /etc/apt/sources.list.d/backports.list
-#RUN apt-get update
-#RUN apt-get install -y openssl wget zlib1g-dev
-#RUN echo "deb ftp://ftp.unicamp.br/pub/linuxpatch/toolchain/at/ubuntu xenial at10.0" > /etc/apt/sources.list.d/at10.list
-#RUN wget -O - ftp://ftp.unicamp.br/pub/linuxpatch/toolchain/at/ubuntu/dists/xenial/6976a827.gpg.key | apt-key add -
-#RUN apt-get update
-#RUN apt-get install -y advance-toolchain-at10.0-runtime \
-#        advance-toolchain-at10.0-devel \
-#        advance-toolchain-at10.0-perf \
-#        advance-toolchain-at10.0-mcore-libs
-
-ENV LD_LIBRARY_PATH=/usr/lib/powerpc64le-linux-gnu/
-
-ENV PATH=/opt/at10.0/bin:$PATH
 
 # Install all OS dependencies for notebook server that starts but lacks all
 # features (e.g., download as all possible file formats)
@@ -52,7 +27,7 @@ RUN echo "LANGUAGE=en_US.UTF-8" >> /etc/default/locale \
  && echo "LC_TYPE=en_US.UTF-8" >> /etc/default/locale \
  && locale-gen en_US en_US.UTF-8
 
-#build and install Tini for ppc64le
+#build and install Tini
 RUN wget https://github.com/krallin/tini/archive/v0.18.0.tar.gz && \
     tar zxvf v0.18.0.tar.gz && \
     rm -rf v0.18.0.tar.gz
@@ -96,10 +71,10 @@ RUN mkdir /home/$NB_USER/work && \
 # Install conda as jovyan
 ENV MINICONDA_VERSION 4.5.11
 RUN cd /tmp && \
-    wget --quiet https://repo.continuum.io/miniconda/Miniconda3-${MINICONDA_VERSION}-Linux-ppc64le.sh && \
-    echo "4b1ac3b4b70bfa710c9f1c5c6d3f3166 *Miniconda3-${MINICONDA_VERSION}-Linux-ppc64le.sh" | md5sum -c - && \
-    /bin/bash Miniconda3-${MINICONDA_VERSION}-Linux-ppc64le.sh -f -b -p $CONDA_DIR && \
-    rm Miniconda3-${MINICONDA_VERSION}-Linux-ppc64le.sh && \
+    wget --quiet https://repo.continuum.io/miniconda/Miniconda3-${MINICONDA_VERSION}-Linux-x86_64.sh && \
+    echo "e1045ee415162f944b6aebfe560b8fee *Miniconda3-${MINICONDA_VERSION}-Linux-x86_64.sh" | md5sum -c - && \
+    /bin/bash Miniconda3-${MINICONDA_VERSION}-Linux-x86_64.sh -f -b -p $CONDA_DIR && \
+    rm Miniconda3-${MINICONDA_VERSION}-Linux-x86_64.sh && \
     $CONDA_DIR/bin/conda config --system --prepend channels conda-forge && \
     $CONDA_DIR/bin/conda config --system --set auto_update_conda false && \
     $CONDA_DIR/bin/conda config --system --set show_channel_urls true && \
@@ -291,35 +266,30 @@ RUN conda install --quiet --yes \
     fix-permissions /home/$NB_USER
 
 # numba needs this
-RUN conda install --channel=numba llvmlite
+RUN conda install --channel=numba \
+    'llvmlite' \
+    'blas' \
+    'conda-forge::blas=*=openblas' \
+    'numba=0.38*'
 
 USER root
 
-ENV CFLAGS="-L/opt/ibm/xlmass/9.1.0/lib -L/opt/ibm/xlf/16.1.0 -L/opt/ibm/xlC/16.1.0/lib -L/opt/ibm/lib/ -L/opt/ibm/xlsmp/5.1.0/lib"
-RUN for dir in $(find /opt/ibm -name lib) ; do echo $dir >> /etc/ld.so.conf.d/xl.conf ;  done ; ldconfig -v
-
-RUN git clone git://github.com/xianyi/OpenBLAS.git && \
-    cd OpenBLAS && \
-    make USE_MASS=1 TARGET=POWER8 && \
-    make install && \
-    cd .. && \
-    rm -fr OpenBLAS
-
-USER $NB_UID
-
-#RUN yes | pip install --quiet --no-cache-dir \
-#    'blas'
-#    'conda-forge::blas=*=openblas' \
-#    'numba=0.38*' \
-
-RUN git clone https://github.com/numba/numba.git && \
-   cd numba && \
-   git checkout 0.38.1 && \
-   pip install -r requirements.txt && \
-   python setup.py build_ext --inplace && \
-   python setup.py install && \
-   cd .. && \
-   rm -fr numba
+#RUN git clone git://github.com/xianyi/OpenBLAS.git && \
+#    cd OpenBLAS && \
+#    make install && \
+#    cd .. && \
+#    rm -fr OpenBLAS
+#
+#USER $NB_UID
+#
+#RUN git clone https://github.com/numba/numba.git && \
+#   cd numba && \
+#   git checkout 0.38.1 && \
+#   pip install -r requirements.txt && \
+#   python setup.py build_ext --inplace && \
+#   python setup.py install && \
+#   cd .. && \
+#   rm -fr numba
 
 USER root
 
@@ -343,7 +313,7 @@ RUN echo /usr/local/cuda-9.0/extras/CUPTI/lib64 > /etc/ld.so.conf.d/cupti.conf &
 
 # nccl v1 uses cuda8-toolkit, and we're using cuda9, so we can't use it
 #RUN conda install -c anaconda nccl
-# There is no nccl v2 for ppc64le, and no source to build it
+# We really should install nccl v2 for x86_64 if we have more than one GPU
 
 # Install Tensorflow (jupyter/tensorflow-notebook)
 # http://ftp.unicamp.br/pub/ppc64el/ai_frameworks/tensorflow/
@@ -355,7 +325,7 @@ USER root
 # In the Ubuntu 16.04 images, cudnn is placed in system paths. Move them to
 # /usr/local/cuda
 RUN cp -P /usr/include/cudnn.h /usr/local/cuda/include
-RUN cp -P /usr/lib/powerpc64le-linux-gnu/libcudnn* /usr/local/cuda/lib64
+RUN cp -P /usr/lib/*-linux-gnu/libcudnn* /usr/local/cuda/lib64
 
 # Configure the build for our CUDA configuration.
 ENV TF_NEED_CUDA 1
@@ -364,27 +334,25 @@ ENV TF_CUDA_COMPUTE_CAPABILITIES=3.0,3.5,5.2,6.0,6.1
 # TODO get NCCL 2 in the docker image
 ENV TF_NCCL_VERSION 1
 
-RUN apt-get update && apt-get install -y --reinstall ca-certificates
-
 RUN git clone https://github.com/tensorflow/tensorflow && \
     cd tensorflow && \
     git checkout v1.10.0 && \
+    export DEBIAN_FRONTEND=noninteractive && \
     ./tensorflow/tools/ci_build/install/install_bootstrap_deb_packages.sh && \
     add-apt-repository -y ppa:openjdk-r/ppa && \
+    add-apt-repository -y ppa:george-edison55/cmake-3.x && \
     ./tensorflow/tools/ci_build/install/install_deb_packages.sh && \
-    ./tensorflow/tools/ci_build/install/install_hdf5_ppc64le.sh && \
+    apt-get update && \
     apt-get install -y gfortran && \
     ./tensorflow/tools/ci_build/install/install_python3.6_pip_packages.sh && \
     ./tensorflow/tools/ci_build/install/install_bazel_from_source.sh && \
-    ./tensorflow/tools/ci_build/install/install_golang_ppc64le.sh && \
+    ./tensorflow/tools/ci_build/install/install_golang.sh && \
     cp ./tensorflow/tools/ci_build/install/.bazelrc /etc/bazel.bazelrc && \
     ./tensorflow/tools/ci_build/builds/configured GPU && \
-    ln -s /usr/local/cuda-9.0/targets/ppc64le-linux/lib/stubs/libcuda.so /usr/local/cuda-9.0/targets/ppc64le-linux/lib/stubs/libcuda.so.1 && \
-    echo /usr/local/cuda-9.0/targets/ppc64le-linux/lib/stubs > /etc/ld.so.conf.d/cuda-9.0.conf && ldconfig && \
     bazel build -j `nproc` --ram_utilization_factor 50 -c opt --config=cuda //tensorflow/tools/pip_package:build_pip_package && \
     ./bazel-bin/tensorflow/tools/pip_package/build_pip_package /tmp && \
-    pip install /tmp/tensorflow-1.10.0-cp36-cp36m-linux_ppc64le.whl && \
-    rm -f /tmp/tensorflow-1.10.0-cp36-cp36m-linux_ppc64le.whl && \
+    pip install /tmp/tensorflow-1.10.0-cp36-cp36m-linux_*.whl && \
+    rm -f /tmp/tensorflow-1.10.0-cp36-cp36m-linux_*.whl && \
     rm -f /etc/ld.so.conf.d/cuda-9.0.conf && ldconfig && \
     echo /usr/local/nvidia/lib64 > /etc/ld.so.conf.d/nvidia-lib64.conf && ldconfig && \
     cd .. && \
@@ -419,6 +387,7 @@ RUN apt-get -f -y install && \
     rm -fr r
 
 # Install Jupyter IRkernel for the R kernel
+RUN apt-get install -y libssl-dev
 RUN R --vanilla -e "install.packages('devtools', repos='http://cran.us.r-project.org')"
 RUN R --vanilla -e "devtools::install_github('IRkernel/IRkernel')"
 RUN R --vanilla -e "IRkernel::installspec()"
@@ -464,26 +433,8 @@ RUN conda update -n base -c defaults conda
 #RUN apt-get install -y python-opencv python-opencv-apps libopencv-gpu-dev
 RUN yes | conda install opencv py-opencv
 
-# Install theano for python3
-RUN yes | conda install theano
-
-# Install theano and keras for python2
-RUN bash -c 'export PATH=/opt/conda/bin:$PATH ; \
-    source activate py2 ; \
-    yes | conda install theano keras'
-
-# Try and sort out the _gfortran_stop_numeric_f08 problem
-#RUN ln -s /opt/conda/powerpc64le-conda_cos7-linux-gnu/sysroot/lib/libgfortran.so.4 /usr/lib/powerpc64le-linux-gnu/libgfortran.so.4
-#RUN pip install --force-reinstall numpy==1.14.5 protobuf==3.6.0 setuptools==39.1.0 keras-preprocessing==1.0.2
-#RUN apt-get install -y gfortran-5-powerpc-linux-gnu
-RUN mv /opt/conda/lib/python3.6/site-packages/scipy/ /opt/conda/lib/python3.6/site-packages/scipy.disabled
-RUN ln -s /opt/conda/pkgs/scipy-1.1.0-py36h9c1e066_0/lib/python3.6/site-packages/scipy /opt/conda/lib/python3.6/site-packages/scipy
-
 RUN chown -R $NB_USER:users /home/$NB_USER
 RUN chown -R $NB_USER:users /usr/local
-RUN chown -R $NB_USER:users /opt/conda
-
-RUN yes | pip install --quiet --no-cache-dir 'jupyterhub'
 
 ## Install VNC
 #RUN apt-get install -y --no-install-recommends xterm xfonts-base x11-xserver-utils supervisor openbox wget bzip2 ca-certificates websockify xinit novnc xfce4

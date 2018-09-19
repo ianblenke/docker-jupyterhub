@@ -472,13 +472,6 @@ RUN bash -c 'export PATH=/opt/conda/bin:$PATH ; \
     source activate py2 ; \
     yes | conda install theano keras'
 
-# Try and sort out the _gfortran_stop_numeric_f08 problem
-#RUN ln -s /opt/conda/powerpc64le-conda_cos7-linux-gnu/sysroot/lib/libgfortran.so.4 /usr/lib/powerpc64le-linux-gnu/libgfortran.so.4
-#RUN pip install --force-reinstall numpy==1.14.5 protobuf==3.6.0 setuptools==39.1.0 keras-preprocessing==1.0.2
-#RUN apt-get install -y gfortran-5-powerpc-linux-gnu
-RUN mv /opt/conda/lib/python3.6/site-packages/scipy/ /opt/conda/lib/python3.6/site-packages/scipy.disabled
-RUN ln -s /opt/conda/pkgs/scipy-1.1.0-py36h9c1e066_0/lib/python3.6/site-packages/scipy /opt/conda/lib/python3.6/site-packages/scipy
-
 RUN chown -R $NB_USER:users /home/$NB_USER
 RUN chown -R $NB_USER:users /usr/local
 RUN chown -R $NB_USER:users /opt/conda
